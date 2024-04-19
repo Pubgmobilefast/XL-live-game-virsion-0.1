@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Shooter</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gameCanvas {
+            border: 2px solid black;
+        }
+
+        #scoreDisplay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            color: black; /* Changed color to black */
+        }
+
+        #winnerTitle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: black; /* Changed color to black */
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="scoreDisplay">Score: <span id="score" style="color: black;">0</span> | Zombie Kills: <span id="zombieKills" style="color: black;">0</span></div>
+        <div id="winnerTitle" style="color: black;">Winner!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const scoreSpan = document.getElementById('score');
+        const zombieKillsSpan = document.getElementById('zombieKills');
+        const winnerTitle = document.getElementById('winnerTitle');
+
+        // Player
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 30,
+            width: 30,
+            height: 30,
+            speed: 5
+        };
+
+        // Controls
+        const keys = {};
+        let isShooting = false;
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 2 && !isShooting) { // Right mouse button clicked and not already shooting
+                shoot();
+                isShooting = true;
+            } else if (e.button === 0) { // Left mouse button clicked
+                isShooting = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isShooting = false;
+        });
+
+        function movePlayer() {
+            if (keys['ArrowLeft'] && player.x > 0) {
+                player.x -= player.speed;
+            }
+
+            if (keys['ArrowRight'] && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+        }
+
+        // Bullets
+        const bullets = [];
+        const bulletSpeed = 7;
+
+        function shoot() {
+            bullets.push({ x: player.x + player.width / 2, y: player.y });
+        }
+
+        function moveBullets() {
+            bullets.forEach((bullet) => {
+                bullet.y -= bulletSpeed;
+            });
+
+            bullets.forEach((bullet, index) => {
+                if (bullet.y < 0) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        // Zombies
+        const zombies = [];
+        const zombieSpeed = 2;
+        let score = 0;
+        let zombieKillCount = 0;
+
+        function spawnZombie() {
+            zombies.push({
+                x: Math.random() * canvas.width,
+                y: 0,
+                width: 30,
+                height: 30
+            });
+        }
+
+        function moveZombies() {
+            zombies.forEach((zombie, index) => {
+                zombie.y += zombieSpeed;
+
+                // Check for collision with player
+                if (
+                    player.x < zombie.x + zombie.width &&
+                    player.x + player.width > zombie.x &&
+                    player.y < zombie.y + zombie.height &&
+                    player.y + player.height > zombie.y
+                ) {
+                    // Handle collision, e.g., reduce player health, end game, etc.
+                    resetGame();
+                }
+
+                // Check for collision with bullets
+                bullets.forEach((bullet, bindex) => {
+                    if (
+                        bullet.x < zombie.x + zombie.width &&
+                        bullet.x + 5 > zombie.x &&
+                        bullet.y < zombie.y + zombie.height &&
+                        bullet.y + 10 > zombie.y
+                    ) {
+                        // Remove the bullet and the zombie
+                        bullets.splice(bindex, 1);
+                        zombies.splice(index, 1);
+                        score += 10; // Increase score for each zombie kill
+                        zombieKillCount++; // Increase zombie kill count
+                        updateScore();
+                    }
+                });
+            });
+
+            zombies.forEach((zombie, index) => {
+                if (zombie.y > canvas.height) {
+                    zombies.splice(index, 1);
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            movePlayer();
+
+            if (isShooting) {
+                shoot();
+                isShooting = false; // Set to false to prevent continuous shooting
+            }
+
+            moveBullets();
+            moveZombies();
+
+            // Draw player
+            ctx.fillStyle = 'blue';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw bullets
+            ctx.fillStyle = 'red';
+            bullets.forEach((bullet) => {
+                ctx.fillRect(bullet.x, bullet.y, 5, 10);
+            });
+
+            // Draw zombies
+            ctx.fillStyle = 'green';
+            zombies.forEach((zombie) => {
+                ctx.fillRect(zombie.x, zombie.y, zombie.width, zombie.height);
+            });
+
+            // Draw score
+            ctx.fillStyle = 'black'; // Changed color to black
+            ctx.font = '20px Arial';
+            scoreSpan.textContent = score;
+            zombieKillsSpan.textContent = zombieKillCount;
+
+            // Check for winning condition
+            if (score >= 999) {
+                winnerTitle.style.display = 'block';
+                setTimeout(() => {
+                    winnerTitle.style.display = 'none';
+                    resetGame();
+                }, 3000); // Show winner title for 3 seconds
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        function resetGame() {
+            bullets.length = 0;
+            zombies.length = 0;
+            score = 0;
+            zombieKillCount = 0;
+            updateScore();
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = score;
+        }
+
+        // Game loop
+        setInterval(() => {
+            spawnZombie();
+        }, 1000);
+
+        draw();
+    </script>
+</body>
+</html>
